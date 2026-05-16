@@ -1,0 +1,56 @@
+name: ai-memory-global
+
+# Global persistent memory service — shared across ALL projects
+# Start once: docker compose -f C:\Users\vikas\.ai-memory\docker-compose.yml up -d
+# Never stop it — it's your brain across all IDEs and projects
+
+services:
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: ai-memory-neo4j
+    ports:
+      - "7474:7474"   # Browser: http://localhost:7474
+      - "7687:7687"   # Bolt URI: bolt://localhost:7687
+    environment:
+      - NEO4J_AUTH=neo4j/vikasai123
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_server_memory_heap_initial__size=256m
+      - NEO4J_server_memory_heap_max__size=512m
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:7474"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  mcp-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: ai-memory-mcp
+    ports:
+      - "7688:7688"   # HTTP API for IDEs that don't support stdio MCP
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=vikasai123
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - GITHUB_USERNAME=vikaspandita12
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    restart: always
+    volumes:
+      - ./server:/app
+      - projects_index:/data
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  projects_index:
